@@ -191,6 +191,7 @@ async def chat_with_ai(request: MessageRequest):
         elif MOCK_MODE or model is None:
             # Mock response for testing without API key or model
             farming_responses = [
+                "Hi, Welcome How Can I assist You ?",
                 "For better crop yield, consider rotating your crops seasonally. This helps prevent soil nutrient depletion.",
                 "Organic fertilizers like compost can improve soil health significantly. They add nutrients and improve soil structure.",
                 "Proper irrigation scheduling is crucial for water conservation. Drip irrigation can save up to 50% water compared to flood irrigation.",
@@ -208,6 +209,7 @@ async def chat_with_ai(request: MessageRequest):
             try:
                 # Create farming-specific prompt
                 farming_prompt = f"""You are an agricultural expert assistant helping farmers. Provide helpful, accurate, practical advice about:
+- Hi
 - Crop cultivation best practices
 - Soil health and fertilization
 - Pest and disease management

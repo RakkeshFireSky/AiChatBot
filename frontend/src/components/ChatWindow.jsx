@@ -141,7 +141,7 @@ export default function ChatWindow({ isSidebarOpen, currentChatId, setCurrentCha
   };
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-900">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-900 ">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="flex items-center">

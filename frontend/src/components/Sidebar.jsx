@@ -91,21 +91,21 @@ export default function Sidebar({ isOpen, toggleSidebar, theme, toggleTheme, cur
 
   return (
     <div className={`bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-full flex flex-col border-r border-gray-200 dark:border-gray-700 transition-all duration-300
-      ${isOpen ? "w-64" : "w-16"}`}>
+      ${isOpen ? "w-68" : "w-16"}`}>
 
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         {isOpen ? (
-          <h1 className="text-xl font-bold text-green-600 dark:text-green-400">FarmAI Assistant</h1>
+          <h1 className="text-sm font-semibold text-green-600 dark:text-green-400">Aggrising</h1>
         ) : (
-          <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
+          <div className="w-8 h-8 p-2 rounded-full bg-green-600 flex items-center justify-center">
             <MessageSquare className="text-white w-5 h-5" />
           </div>
         )}
         <button
-          className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          className="p-1 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           onClick={toggleSidebar}
         >
-          <ArrowLeft className={`w-4 h-4 transition-transform ${isOpen ? "" : "rotate-180"}`} />
+          <ArrowLeft className={`w-3 h-3 font-bold transition-transform ${isOpen ? "" : "rotate-180"}`} />
         </button>
       </div>
 

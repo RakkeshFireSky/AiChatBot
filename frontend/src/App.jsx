@@ -25,13 +25,17 @@ function App() {
   };
 
   const loadChats = async () => {
-    // This function will be passed to Sidebar and ChatWindow to refresh the chat list
-    // You can implement API call here if needed
-    console.log("Refreshing chat list");
+    try {
+      const response = await fetch("http://localhost:8001/chats");
+      const data = await response.json();
+      setChats(data.sessions);
+    } catch (error) {
+      console.error("Error loading chats:", error);
+    }
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 w-screen">
       <Sidebar
         isOpen={isSidebarOpen}
         toggleSidebar={toggleSidebar}
@@ -43,14 +47,16 @@ function App() {
         setChats={setChats}
         loadChats={loadChats}
       />
-      <ChatWindow
-        isSidebarOpen={isSidebarOpen}
-        currentChatId={currentChatId}
-        setCurrentChatId={setCurrentChatId}
-        chats={chats}
-        setChats={setChats}
-        loadChats={loadChats}
-      />
+      <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? "ml-0" : "ml-10"}`}>
+        <ChatWindow
+          isSidebarOpen={isSidebarOpen}
+          currentChatId={currentChatId}
+          setCurrentChatId={setCurrentChatId}
+          chats={chats}
+          setChats={setChats}
+          loadChats={loadChats}
+        />
+      </div>
     </div>
   );
 }
