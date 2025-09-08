@@ -95,7 +95,7 @@ export default function Sidebar({ isOpen, toggleSidebar, theme, toggleTheme, cur
 
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         {isOpen ? (
-          <h1 className="text-sm font-semibold text-green-600 dark:text-green-400">Aggrising</h1>
+          <p className="text-2xl font-semibold text-green-600 dark:text-green-400">Aggrising</p>
         ) : (
           <div className="w-8 h-8 p-2 rounded-full bg-green-600 flex items-center justify-center">
             <MessageSquare className="text-white w-5 h-5" />

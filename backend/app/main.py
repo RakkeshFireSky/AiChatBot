@@ -78,27 +78,47 @@ else:
 chat_sessions = {}
 chat_messages = {}
 
-# Fixed query responses
+# Enhanced Fixed query responses for better testing
 FIXED_QUERIES = {
     "weather": {
-        "patterns": [r"weather", r"rain", r"temperature", r"forecast", r"humidity"],
-        "response": "For accurate weather information, I recommend checking your local weather service. For farming, ideal temperatures are between 15-30°C with moderate humidity (40-70%). Rainfall of 1-2 inches per week is generally good for most crops."
+        "patterns": [r"weather", r"rain", r"temperature", r"forecast", r"humidity", r"sunny", r"cloudy"],
+        "response": "For accurate weather information, I recommend checking your local weather service. Ideal farming conditions are temperatures between 15-30°C with moderate humidity (40-70%). Rainfall of 1-2 inches per week benefits most crops. Always check your local forecast before planning farming activities."
     },
     "soil": {
-        "patterns": [r"soil", r"ph", r"nutrient", r"fertili[sz]er", r"compost"],
-        "response": "Soil health is crucial for farming. Most crops prefer a pH between 6.0-7.0. Regular soil testing every season helps determine nutrient requirements. Organic matter like compost improves soil structure and fertility."
+        "patterns": [r"soil", r"ph", r"nutrient", r"fertili[sz]er", r"compost", r"manure", r"nitrogen", r"phosphorus", r"potassium"],
+        "response": "Soil health is crucial for farming. Most crops prefer a pH between 6.0-7.0. Regular soil testing every season helps determine nutrient requirements. Organic matter like compost improves soil structure and fertility. For specific recommendations, get your soil tested at a local agricultural extension office."
     },
     "crops": {
-        "patterns": [r"crop", r"plant", r"harvest", r"yield", r"season"],
-        "response": "Different crops have different growing seasons and requirements. Common crops include wheat, rice, corn, and vegetables. Crop rotation helps maintain soil health and prevent pest buildup."
+        "patterns": [r"crop", r"plant", r"harvest", r"yield", r"season", r"wheat", r"rice", r"corn", r"vegetables", r"fruits"],
+        "response": "Different crops have different growing seasons and requirements. Common crops include wheat, rice, corn, and various vegetables. Crop rotation helps maintain soil health and prevent pest buildup. The best crops for your area depend on climate, soil type, and market demand."
     },
     "pests": {
-        "patterns": [r"pest", r"insect", r"disease", r"bug", r"infestation"],
-        "response": "Integrated Pest Management (IPM) is recommended. This includes cultural practices, biological controls, and careful use of pesticides. Regular monitoring helps detect issues early."
+        "patterns": [r"pest", r"insect", r"disease", r"bug", r"infestation", r"aphid", r"caterpillar", r"fungus", r"mold"],
+        "response": "Integrated Pest Management (IPM) is recommended. This includes cultural practices (crop rotation), biological controls (beneficial insects), and careful use of pesticides. Regular monitoring helps detect issues early. For specific pest problems, consult with your local agricultural extension service."
     },
     "irrigation": {
-        "patterns": [r"water", r"irrigation", r"drip", r"sprinkler", r"moisture"],
-        "response": "Efficient irrigation saves water and improves yields. Drip irrigation can save 30-50% water compared to flood irrigation. Water requirements vary by crop and growth stage."
+        "patterns": [r"water", r"irrigation", r"drip", r"sprinkler", r"moisture", r"watering", r"drought"],
+        "response": "Efficient irrigation saves water and improves yields. Drip irrigation can save 30-50% water compared to flood irrigation. Water requirements vary by crop and growth stage. Most crops need about 1 inch of water per week during growing season, either from rainfall or irrigation."
+    },
+    "greeting": {
+        "patterns": [r"hello", r"hi", r"hey", r"greetings", r"good morning", r"good afternoon", r"good evening"],
+        "response": "Hello! I'm your farming assistant. How can I help you with your agricultural questions today? I can assist with crop advice, soil management, pest control, irrigation, and more!"
+    },
+    "thanks": {
+        "patterns": [r"thank", r"thanks", r"appreciate", r"grateful"],
+        "response": "You're welcome! I'm happy to help with your farming questions. Is there anything else you'd like to know about agriculture or farming practices?"
+    },
+    "organic": {
+        "patterns": [r"organic", r"natural", r"chemical-free", r"pesticide-free"],
+        "response": "Organic farming focuses on using natural methods without synthetic chemicals. This includes using compost, crop rotation, biological pest control, and cover crops. Organic certification requires following specific guidelines and practices over a transition period."
+    },
+    "equipment": {
+        "patterns": [r"tractor", r"equipment", r"tool", r"plow", r"harvester", r"machinery"],
+        "response": "Farm equipment depends on your scale of operation. Basic tools include plows, tillers, and harvesters. For small farms, hand tools may be sufficient, while larger operations benefit from tractors and specialized machinery. Always prioritize safety when operating farm equipment."
+    },
+    "profit": {
+        "patterns": [r"profit", r"income", r"revenue", r"money", r"cost", r"expensive", r"affordable"],
+        "response": "Farm profitability depends on many factors: crop selection, market prices, input costs, and efficiency. Diversifying crops, adding value through processing, and direct marketing can increase profits. Start with a business plan and consider consulting with agricultural economists."
     }
 }
 
@@ -151,7 +171,8 @@ async def root():
         "message": "Farmer AI Chatbot API", 
         "status": "running", 
         "mock_mode": MOCK_MODE,
-        "model_available": model is not None
+        "model_available": model is not None,
+        "fixed_queries": list(FIXED_QUERIES.keys())
     }
 
 @app.post("/chat", response_model=MessageResponse)
@@ -191,7 +212,7 @@ async def chat_with_ai(request: MessageRequest):
         elif MOCK_MODE or model is None:
             # Mock response for testing without API key or model
             farming_responses = [
-                "Hi, Welcome How Can I assist You ?",
+                "Hello! I'm your farming assistant. How can I help you with your agricultural questions today?",
                 "For better crop yield, consider rotating your crops seasonally. This helps prevent soil nutrient depletion.",
                 "Organic fertilizers like compost can improve soil health significantly. They add nutrients and improve soil structure.",
                 "Proper irrigation scheduling is crucial for water conservation. Drip irrigation can save up to 50% water compared to flood irrigation.",
@@ -209,7 +230,6 @@ async def chat_with_ai(request: MessageRequest):
             try:
                 # Create farming-specific prompt
                 farming_prompt = f"""You are an agricultural expert assistant helping farmers. Provide helpful, accurate, practical advice about:
-- Hi
 - Crop cultivation best practices
 - Soil health and fertilization
 - Pest and disease management
@@ -314,6 +334,48 @@ async def update_chat_title(chat_id: str, title: str):
     chat_sessions[chat_id]["updated_at"] = datetime.now()
     
     return {"message": "Chat title updated successfully"}
+
+@app.get("/test-queries")
+async def get_test_queries():
+    """Endpoint to get sample test queries for testing fixed responses"""
+    test_queries = []
+    for category, data in FIXED_QUERIES.items():
+        # Create sample queries based on patterns
+        samples = []
+        for pattern in data["patterns"][:3]:  # Take first 3 patterns from each category
+            # Convert regex patterns to sample questions
+            if pattern == r"weather":
+                samples.append("What's the weather forecast for farming?")
+            elif pattern == r"soil":
+                samples.append("How can I improve my soil quality?")
+            elif pattern == r"crop":
+                samples.append("Which crops are best for my region?")
+            elif pattern == r"pest":
+                samples.append("How do I deal with pests in my crops?")
+            elif pattern == r"irrigation":
+                samples.append("What's the best irrigation method?")
+            elif pattern == r"hello":
+                samples.append("Hello!")
+            elif pattern == r"thank":
+                samples.append("Thanks for your help!")
+            elif pattern == r"organic":
+                samples.append("How do I start organic farming?")
+            elif pattern == r"equipment":
+                samples.append("What equipment do I need for a small farm?")
+            elif pattern == r"profit":
+                samples.append("How can I increase farm profits?")
+            else:
+                # Generic sample based on pattern
+                clean_pattern = pattern.replace("r\"", "").replace("\"", "").replace("\\", "")
+                samples.append(f"Tell me about {clean_pattern}")
+        
+        test_queries.append({
+            "category": category,
+            "samples": samples,
+            "response_preview": data["response"][:100] + "..." if len(data["response"]) > 100 else data["response"]
+        })
+    
+    return {"test_queries": test_queries}
 
 @app.get("/models")
 async def get_available_models():
