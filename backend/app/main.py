@@ -1,11 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import re
 
 # Load environment variables
 load_dotenv()
@@ -77,6 +78,30 @@ else:
 chat_sessions = {}
 chat_messages = {}
 
+# Fixed query responses
+FIXED_QUERIES = {
+    "weather": {
+        "patterns": [r"weather", r"rain", r"temperature", r"forecast", r"humidity"],
+        "response": "For accurate weather information, I recommend checking your local weather service. For farming, ideal temperatures are between 15-30°C with moderate humidity (40-70%). Rainfall of 1-2 inches per week is generally good for most crops."
+    },
+    "soil": {
+        "patterns": [r"soil", r"ph", r"nutrient", r"fertili[sz]er", r"compost"],
+        "response": "Soil health is crucial for farming. Most crops prefer a pH between 6.0-7.0. Regular soil testing every season helps determine nutrient requirements. Organic matter like compost improves soil structure and fertility."
+    },
+    "crops": {
+        "patterns": [r"crop", r"plant", r"harvest", r"yield", r"season"],
+        "response": "Different crops have different growing seasons and requirements. Common crops include wheat, rice, corn, and vegetables. Crop rotation helps maintain soil health and prevent pest buildup."
+    },
+    "pests": {
+        "patterns": [r"pest", r"insect", r"disease", r"bug", r"infestation"],
+        "response": "Integrated Pest Management (IPM) is recommended. This includes cultural practices, biological controls, and careful use of pesticides. Regular monitoring helps detect issues early."
+    },
+    "irrigation": {
+        "patterns": [r"water", r"irrigation", r"drip", r"sprinkler", r"moisture"],
+        "response": "Efficient irrigation saves water and improves yields. Drip irrigation can save 30-50% water compared to flood irrigation. Water requirements vary by crop and growth stage."
+    }
+}
+
 class MessageRequest(BaseModel):
     message: str
     chat_id: Optional[str] = None
@@ -84,6 +109,7 @@ class MessageRequest(BaseModel):
 class MessageResponse(BaseModel):
     response: str
     chat_id: str
+    chat_title: str
 
 class ChatMessage(BaseModel):
     sender: str
@@ -95,6 +121,29 @@ class ChatSession(BaseModel):
     title: str
     created_at: datetime
     updated_at: datetime
+
+def check_fixed_queries(message: str) -> Optional[str]:
+    """Check if the message matches any fixed query patterns"""
+    message_lower = message.lower()
+    
+    for query_type, query_data in FIXED_QUERIES.items():
+        for pattern in query_data["patterns"]:
+            if re.search(pattern, message_lower, re.IGNORECASE):
+                return query_data["response"]
+    
+    return None
+
+def generate_chat_title(message: str) -> str:
+    """Generate a title for the chat based on the first message"""
+    # Try to extract key words for the title
+    words = message.split()[:5]  # Take first 5 words
+    title = " ".join(words)
+    
+    # If the message is too long, add ellipsis
+    if len(title) > 25:
+        title = title[:22] + "..."
+    
+    return title or "New Chat"
 
 @app.get("/")
 async def root():
@@ -108,17 +157,20 @@ async def root():
 @app.post("/chat", response_model=MessageResponse)
 async def chat_with_ai(request: MessageRequest):
     try:
+        # Check for fixed queries first
+        fixed_response = check_fixed_queries(request.message)
+        
         # Get or create chat session
         if request.chat_id and request.chat_id in chat_sessions:
             chat_id = request.chat_id
-            title = chat_sessions[chat_id]["title"]
+            chat_title = chat_sessions[chat_id]["title"]
         else:
             # Create a new chat session
-            chat_id = str(len(chat_sessions) + 1)
-            title = request.message[:30] + "..." if len(request.message) > 30 else request.message
+            chat_id = str(datetime.now().timestamp())
+            chat_title = generate_chat_title(request.message)
             chat_sessions[chat_id] = {
                 "chat_id": chat_id,
-                "title": title,
+                "title": chat_title,
                 "created_at": datetime.now(),
                 "updated_at": datetime.now()
             }
@@ -133,7 +185,10 @@ async def chat_with_ai(request: MessageRequest):
         chat_messages[chat_id].append(user_message)
         
         # Generate AI response
-        if MOCK_MODE or model is None:
+        if fixed_response:
+            # Use fixed response if query matches patterns
+            response_text = fixed_response
+        elif MOCK_MODE or model is None:
             # Mock response for testing without API key or model
             farming_responses = [
                 "For better crop yield, consider rotating your crops seasonally. This helps prevent soil nutrient depletion.",
@@ -191,7 +246,11 @@ Please provide a concise, practical answer focused on actionable advice:"""
         # Update chat session timestamp
         chat_sessions[chat_id]["updated_at"] = datetime.now()
         
-        return MessageResponse(response=response_text, chat_id=chat_id)
+        return MessageResponse(
+            response=response_text, 
+            chat_id=chat_id,
+            chat_title=chat_title
+        )
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
@@ -205,22 +264,54 @@ async def get_chat_history(chat_id: str):
         "chat_id": chat_id,
         "title": chat_sessions.get(chat_id, {}).get("title", "Unknown"),
         "messages": chat_messages[chat_id],
-        "created_at": chat_sessions.get(chat_id, {}).get("created_at", datetime.now())
+        "created_at": chat_sessions.get(chat_id, {}).get("created_at", datetime.now()),
+        "updated_at": chat_sessions.get(chat_id, {}).get("updated_at", datetime.now())
     }
 
 @app.get("/chats")
 async def get_all_chat_sessions():
+    # Sort chats by updated_at in descending order
+    sorted_sessions = sorted(
+        chat_sessions.values(),
+        key=lambda x: x["updated_at"],
+        reverse=True
+    )
+    
     return {
         "sessions": [
             {
                 "chat_id": session["chat_id"],
                 "title": session["title"],
                 "created_at": session["created_at"],
-                "updated_at": session["updated_at"]
+                "updated_at": session["updated_at"],
+                "message_count": len(chat_messages.get(session["chat_id"], []))
             }
-            for session in chat_sessions.values()
+            for session in sorted_sessions
         ]
     }
+
+@app.delete("/chats/{chat_id}")
+async def delete_chat_session(chat_id: str):
+    if chat_id in chat_sessions:
+        del chat_sessions[chat_id]
+    
+    if chat_id in chat_messages:
+        del chat_messages[chat_id]
+    
+    return {"message": "Chat session deleted successfully"}
+
+@app.put("/chats/{chat_id}/title")
+async def update_chat_title(chat_id: str, title: str):
+    if chat_id not in chat_sessions:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    
+    if not title.strip():
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+    
+    chat_sessions[chat_id]["title"] = title.strip()
+    chat_sessions[chat_id]["updated_at"] = datetime.now()
+    
+    return {"message": "Chat title updated successfully"}
 
 @app.get("/models")
 async def get_available_models():

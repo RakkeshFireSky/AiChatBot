@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Bot, User, Loader } from "lucide-react";
+import { Send, Bot, User, Loader, MessageSquare } from "lucide-react";
 import axios from "axios";
 
 const API_BASE_URL = "http://localhost:8001";
 
-export default function ChatWindow({ isSidebarOpen }) {
+export default function ChatWindow({ isSidebarOpen, currentChatId, setCurrentChatId, chats, setChats, loadChats }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [currentChatId, setCurrentChatId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [chatTitle, setChatTitle] = useState("Farming Assistant");
   const messagesEndRef = useRef(null);
 
   // Load chat history when component mounts or chatId changes
@@ -24,6 +24,7 @@ export default function ChatWindow({ isSidebarOpen }) {
           text: "Hello! I'm your farming assistant. How can I help you with your agricultural questions today?" 
         }
       ]);
+      setChatTitle("Farming Assistant");
     }
   }, [currentChatId]);
 
@@ -51,6 +52,7 @@ export default function ChatWindow({ isSidebarOpen }) {
       }));
       
       setMessages(formattedMessages);
+      setChatTitle(chatData.title || "Farming Assistant");
     } catch (error) {
       console.error("Error loading chat history:", error);
       setError("Could not load chat history. Starting a new conversation.");
@@ -61,6 +63,7 @@ export default function ChatWindow({ isSidebarOpen }) {
           text: "Hello! I'm your farming assistant. How can I help you with your agricultural questions today?" 
         }
       ]);
+      setChatTitle("Farming Assistant");
     } finally {
       setIsLoading(false);
     }
@@ -97,13 +100,15 @@ export default function ChatWindow({ isSidebarOpen }) {
       };
       setMessages(prev => [...prev, aiMessage]);
       
-      // Set chat ID if this is a new chat
+      // Set chat ID and title if this is a new chat
       if (!currentChatId) {
         setCurrentChatId(response.data.chat_id);
-        // Update sidebar to reflect new chat (you might want to lift this state up)
-        if (window.updateChatList) {
-          window.updateChatList();
-        }
+        setChatTitle(response.data.chat_title);
+      }
+      
+      // Refresh the chat list in sidebar
+      if (loadChats) {
+        loadChats();
       }
     } catch (error) {
       console.error("Error sending message:", error);
@@ -131,6 +136,7 @@ export default function ChatWindow({ isSidebarOpen }) {
         text: "Hello! I'm your farming assistant. How can I help you with your agricultural questions today?" 
       }
     ]);
+    setChatTitle("Farming Assistant");
     setError("");
   };
 
@@ -140,18 +146,21 @@ export default function ChatWindow({ isSidebarOpen }) {
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="flex items-center">
           <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Farming Assistant
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 flex items-center">
+            <MessageSquare className="w-5 h-5 mr-2" />
+            {chatTitle}
           </h2>
         </div>
-        {currentChatId && (
-          <button
-            onClick={startNewChat}
-            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            New Chat
-          </button>
-        )}
+        <div className="flex space-x-2">
+          {currentChatId && (
+            <button
+              onClick={startNewChat}
+              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              New Chat
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Error message */}
@@ -235,7 +244,7 @@ export default function ChatWindow({ isSidebarOpen }) {
           </button>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-          Ask me about crops, soil, irrigation, pests, or any farming topic!
+          Ask me about crops, soil, irrigation, pests, weather, or any farming topic!
         </p>
       </div>
     </div>

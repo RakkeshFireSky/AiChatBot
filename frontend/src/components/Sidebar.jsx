@@ -1,13 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { ArrowLeft, Plus, MoreHorizontal, MessageSquare, Trash2, Edit3, Sun, Moon } from "lucide-react";
+import axios from "axios";
+
+const API_BASE_URL = "http://localhost:8001";
 
 export default function Sidebar({ isOpen, toggleSidebar, theme, toggleTheme, currentChatId, setCurrentChatId }) {
   const [chats, setChats] = useState([]);
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const menuRef = useRef();
 
   useEffect(() => {
+    loadChats();
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpenId(null);
@@ -17,38 +22,71 @@ export default function Sidebar({ isOpen, toggleSidebar, theme, toggleTheme, cur
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const loadChats = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/chats`);
+      setChats(response.data.sessions);
+    } catch (error) {
+      console.error("Error loading chats:", error);
+    }
+  };
+
   const addNewChat = () => {
-    const newChat = {
-      id: Date.now().toString(),
-      name: "New Chat",
-      updatedAt: new Date()
-    };
-    setChats([newChat, ...chats]);
-    setCurrentChatId(newChat.id);
+    setCurrentChatId(null);
     setMenuOpenId(null);
   };
 
-  const deleteChat = (id) => {
-    setChats(chats.filter(c => c.id !== id));
-    if (currentChatId === id) {
-      setCurrentChatId(chats.length > 1 ? chats[0].id : null);
+  const deleteChat = async (id) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/chats/${id}`);
+      setChats(chats.filter(c => c.chat_id !== id));
+      if (currentChatId === id) {
+        setCurrentChatId(null);
+      }
+    } catch (error) {
+      console.error("Error deleting chat:", error);
     }
     setMenuOpenId(null);
   };
 
-  const renameChat = (id, newName) => {
+  const renameChat = async (id, newName) => {
     if (newName.trim() === "") return;
-    setChats(chats.map(c => (c.id === id ? { ...c, name: newName } : c)));
+    
+    try {
+      await axios.put(`${API_BASE_URL}/chats/${id}/title`, null, {
+        params: { title: newName }
+      });
+      setChats(chats.map(c => (c.chat_id === id ? { ...c, title: newName } : c)));
+    } catch (error) {
+      console.error("Error renaming chat:", error);
+    }
     setEditingId(null);
+    setEditingTitle("");
   };
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const startEditing = (chat) => {
+    setEditingId(chat.chat_id);
+    setEditingTitle(chat.title);
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return "Today";
+    } else if (diffDays === 1) {
+      return "Yesterday";
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    }
   };
 
   return (
@@ -86,31 +124,40 @@ export default function Sidebar({ isOpen, toggleSidebar, theme, toggleTheme, cur
         </div>
         {chats.map(chat => (
           <div
-            key={chat.id}
+            key={chat.chat_id}
             className={`flex items-center justify-between p-2 rounded-lg group cursor-pointer transition-colors
-              ${currentChatId === chat.id 
+              ${currentChatId === chat.chat_id 
                 ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" 
                 : "hover:bg-gray-100 dark:hover:bg-gray-700"}`}
-            onClick={() => setCurrentChatId(chat.id)}
+            onClick={() => setCurrentChatId(chat.chat_id)}
           >
             <div className="flex items-center min-w-0 flex-1">
               <MessageSquare className="w-4 h-4 mr-2 flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                {editingId === chat.id ? (
+                {editingId === chat.chat_id ? (
                   <input
                     autoFocus
-                    defaultValue={chat.name}
-                    onBlur={(e) => renameChat(chat.id, e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onBlur={() => renameChat(chat.chat_id, editingTitle)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        renameChat(chat.chat_id, editingTitle);
+                      } else if (e.key === "Escape") {
+                        setEditingId(null);
+                        setEditingTitle("");
+                      }
+                    }}
                     className="w-full bg-transparent border-b border-green-500 outline-none text-sm py-0.5"
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
                   <>
-                    <span className="truncate text-sm block">{isOpen ? chat.name : chat.name.charAt(0)}</span>
+                    <span className="truncate text-sm block">{isOpen ? chat.title : chat.title.charAt(0)}</span>
                     {isOpen && (
                       <span className="text-xs text-gray-500 dark:text-gray-400 truncate block">
-                        {formatDate(chat.updatedAt)}
+                        {formatDate(chat.updated_at)}
+                        {chat.message_count > 0 && ` • ${chat.message_count} messages`}
                       </span>
                     )}
                   </>
@@ -118,25 +165,25 @@ export default function Sidebar({ isOpen, toggleSidebar, theme, toggleTheme, cur
               </div>
             </div>
 
-            {isOpen && editingId !== chat.id && (
+            {isOpen && editingId !== chat.chat_id && (
               <div className="relative" ref={menuRef}>
                 <button
                   className="p-1 opacity-0 group-hover:opacity-100 focus:opacity-100 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-opacity"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setMenuOpenId(menuOpenId === chat.id ? null : chat.id);
+                    setMenuOpenId(menuOpenId === chat.chat_id ? null : chat.chat_id);
                   }}
                 >
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
 
-                {menuOpenId === chat.id && (
+                {menuOpenId === chat.chat_id && (
                   <div className="absolute right-0 top-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg w-32 z-10 py-1">
                     <button
                       className="w-full text-left px-3 py-2 text-sm flex items-center hover:bg-gray-100 dark:hover:bg-gray-700"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setEditingId(chat.id);
+                        startEditing(chat);
                         setMenuOpenId(null);
                       }}
                     >
@@ -146,7 +193,7 @@ export default function Sidebar({ isOpen, toggleSidebar, theme, toggleTheme, cur
                       className="w-full text-left px-3 py-2 text-sm flex items-center text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteChat(chat.id);
+                        deleteChat(chat.chat_id);
                       }}
                     >
                       <Trash2 className="w-3.5 h-3.5 mr-2" />Delete
